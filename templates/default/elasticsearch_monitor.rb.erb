@@ -47,7 +47,7 @@ class ESMonitor < Rubix::ClusterMonitor
       return false
     end
     write({
-            :host         => "#{cluster_name}-elasticsearch",
+            :host         => cluster_name,
             :host_groups  => self.class::CLUSTER_HOSTGROUPS,
             :templates    => self.class::CLUSTER_TEMPLATES,
             :applications => self.class::CLUSTER_APPLICATIONS

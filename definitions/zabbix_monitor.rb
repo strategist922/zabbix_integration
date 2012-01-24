@@ -1,4 +1,4 @@
-define :zabbix_monitor, :packages => [], :gems => [], :action => :enable do
+define :zabbix_monitor, :packages => [], :gems => [], :loop => 30, :action => :enable do
 
   monitor      = params[:name]
   monitor_path = "/etc/zabbix/externalscripts/#{monitor}_monitor.rb"
@@ -23,6 +23,6 @@ define :zabbix_monitor, :packages => [], :gems => [], :action => :enable do
 
   runit_service "#{monitor}_monitor" do
     template_name "zabbix_monitor"
-    options :monitor_path => monitor_path
+    options :monitor_path => monitor_path, :loop => params[:loop]
   end
 end

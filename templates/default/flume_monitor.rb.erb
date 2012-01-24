@@ -35,7 +35,7 @@ class FlumeMonitor < Rubix::ClusterMonitor
       total_eps += eps
     end
     write({
-            :host         => "#{cluster_name}-flume",
+            :host         => cluster_name,
             :host_groups  => self.class::CLUSTER_HOSTGROUPS,
             :templates    => self.class::CLUSTER_TEMPLATES,
             :applications => self.class::CLUSTER_APPLICATIONS
@@ -104,7 +104,7 @@ class FlumeMonitor < Rubix::ClusterMonitor
 
     before_bytes,  after_bytes  = 0, 0
     before_events, after_events = 0, 0
-    before_node.each_pair do |key, value|
+    before_data.each_pair do |key, value|
       case
       when key =~ /number of bytes$/
         before_bytes += value.to_i
@@ -114,7 +114,7 @@ class FlumeMonitor < Rubix::ClusterMonitor
         next
       end
     end
-    after_node.each_pair do |key, value|
+    after_data.each_pair do |key, value|
       case
       when key =~ /number of bytes$/
         after_bytes += value.to_i

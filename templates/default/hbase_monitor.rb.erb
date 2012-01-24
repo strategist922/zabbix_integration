@@ -43,14 +43,14 @@ class HBaseMonitor < Rubix::ClusterMonitor
       cluster_status = data['ClusterStatus']
       dead_nodes     = cluster_status['DeadNodes'] ? cluster_status['DeadNodes']['Node'] : []
       live_nodes     = cluster_status['LiveNodes']['Node']
-    rescue NoMethodError, SocketError, REXML::ParseException, Errno::ECONNREFUSED => e
+    rescue NoMethodError, SocketError, REXML::ParseException, Errno::ECONNREFUSED, Errno::ETIMEDOUT, EOFError => e
       # puts "#{e.class} -- #{e.message}"
       # puts e.backtrace
       return false
     end
 
     write({
-            :host         => "#{cluster_name}-hbase",
+            :host         => cluster_name,
             :host_groups  => self.class::CLUSTER_HOSTGROUPS,
             :templates    => self.class::CLUSTER_TEMPLATES,
             :applications => self.class::CLUSTER_APPLICATIONS
