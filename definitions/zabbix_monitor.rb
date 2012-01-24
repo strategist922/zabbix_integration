@@ -16,6 +16,7 @@ define :zabbix_monitor, :packages => [], :gems => [], :loop => 30, :action => :e
   end
 
   template monitor_path  do
+    mode 644
     source "#{monitor}_monitor.rb.erb"
     action :create
     notifies :restart, "service[#{monitor}_monitor]", :delayed
