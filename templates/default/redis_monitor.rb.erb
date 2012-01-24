@@ -1,0 +1,115 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'rubix'
+require 'redis'
+
+class RedisMonitor < Rubix::ChefMonitor
+
+  HOST_GROUPS   = 'Redis Servers'
+  TEMPLATES     = 'Template_Redis_Node'
+  APPLICATIONS  = "Redis"
+
+  def measure
+    matching_chef_nodes.first.each do |node|
+      write({
+              :host         => node['node_name'],
+              :host_groups  => self.class::HOST_GROUPS,
+              :templates    => self.class::TEMPLATES,
+              :applications => self.class::APPLICATIONS
+            }) do |d|
+
+        connection = connect(node)
+        if connection
+          d << ['redis.status', 0]
+        else
+          d << ['redis.status', 1]
+          next
+        end
+
+        pinfo = performance_info(connection)
+        next unless pinfo
+        initial, final, dt = pinfo
+        
+        d << ['redis.clients.connected',       final['connected_clients'].to_i]
+        d << ['redis.clients.blocked',         final['blocked_clients'].to_i]
+
+        d << ['redis.mem.used',                final['used_memory'].to_i]
+        d << ['redis.mem.fragmentation',       final['mem_fragmentation_ratio'].to_f]
+
+        d << ['redis.persist.unsaved_changes', final['changes_since_last_save'].to_i]
+        d << ['redis.persist.saving_now',      final['bgsave_in_progress'].to_i]
+        d << ['redis.persist.appending_now',   final['bgwriteaof_in_progress'].to_i]
+
+        d << ['redis.keys.hits',               rate('keyspace_hits',   initial, final, dt)]
+        d << ['redis.keys.misses',             rate('keyspace_misses', initial, final, dt)]
+        d << ['redis.keys.expired',            rate('expired_keys',    initial, final, dt)]
+        d << ['redis.keys.evicted',            rate('evicted_keys',    initial, final, dt)]
+
+        d << ['redis.commands',                rate('total_commands_processed', initial, final, dt)]
+
+        final.keys.each do |key|
+          next unless key.to_s =~ /^db(\d+)$/
+          num = $1.to_i
+          key_count_string = final[key]
+          next unless key_count_string =~ /keys=(\d+),expires=(\d+)/
+          num_keys, num_expires = $1.to_i, $2.to_i
+          d << ["redis.db.#{num}.keys",    num_keys]
+          d << ["redis.db.#{num}.expires", num_expires]
+        end
+      end
+    end
+  end
+
+  def node_query
+    'announces:*-redis-server'
+  end
+
+  def connect node
+    begin
+      Redis.connect(connection_info(node))
+    rescue Errno::EHOSTUNREACH, Errno::ECONNREFUSED, SocketError => e
+      nil
+    end
+  end
+
+  def connection_info node
+    redis_service_name = (node['provides_service'] || {}).keys.detect { |k| k.to_s =~ /-redis$/ }
+    return {} unless redis_service_name
+    redis_service = node['provides_service'][redis_service_name]
+    return {} unless redis_service
+    {
+      :host => node['ipaddress'],
+      :port => (redis_service['port'] || 6379).to_i
+    }
+  end
+
+  def performance_info connection
+    
+    initial = instantaneous_performance_info(connection)
+    sleep 1.0
+    final   = instantaneous_performance_info(connection)
+
+    return unless initial && final
+
+    dt = (final['uptime_in_seconds'].to_f - initial['uptime_in_seconds'].to_f)
+    dt = 1.0 if dt <= 0.001
+    [initial, final, dt]
+  end
+
+  def instantaneous_performance_info connection
+    begin
+      # Hash[*connection.call([:info]).split(/:|\r\n/).grep(/^[^#]/)]
+      connection.info
+    rescue Timeout::Error, Errno::ECONNREFUSED, Errno::EHOSTUNREACH => e
+      nil
+    end
+  end
+  
+  def rate property, initial, final, dt
+    (final[property].to_f - initial[property].to_f) / dt
+  end
+  
+end
+
+RedisMonitor.run if $0 == __FILE__

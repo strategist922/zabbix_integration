@@ -1,0 +1,135 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'rubix'
+require 'open-uri'
+require 'json'
+
+class FlumeMonitor < Rubix::ClusterMonitor
+
+  # Hostgroups for any hosts that need to be created.
+  CLUSTER_HOSTGROUPS = 'Flume clusters'
+  NODE_HOSTGROUPS    = 'Flume nodes'
+
+  # Templates for any hosts that need to be created
+  CLUSTER_TEMPLATES = 'Template_Flume_Cluster'
+  NODE_TEMPLATES    = 'Template_Flume_Node'
+
+  # Applications for new items
+  CLUSTER_APPLICATIONS = 'Throughput'
+  NODE_APPLICATIONS    = 'Flume'
+
+  def node_query
+    'announces:*-flume-master'
+  end
+
+  def flume_url private_ip, *args
+    "http://" + File.join(private_ip + ":35862", *args)
+  end
+
+  def measure_cluster cluster_name
+    total_bps, total_eps = 0.0, 0.0
+    private_ips_by_cluster[cluster_name].each do |private_ip|
+      bps, eps = measure_physical_node(private_ip)
+      total_bps += bps
+      total_eps += eps
+    end
+    write({
+            :host         => "#{cluster_name}-flume",
+            :host_groups  => self.class::CLUSTER_HOSTGROUPS,
+            :templates    => self.class::CLUSTER_TEMPLATES,
+            :applications => self.class::CLUSTER_APPLICATIONS
+          }) do |d|
+      d << [ 'bytes',  total_bps ]
+      d << [ 'events', total_eps ]
+    end
+  end
+
+  def measure_physical_node private_ip
+    total_bps, total_eps = 0.0, 0.0
+    begin
+      physical_node = JSON.parse(open(flume_url(private_ip, 'node', 'reports')).read)
+    rescue SocketError, OpenURI::HTTPError, JSON::ParserError, Errno::ECONNREFUSED => e
+      return [total_bps, total_eps]
+    end
+    node_name = chef_node_name_from_ip(private_ip)
+    return [total_bps, total_eps] unless node_name
+      
+    physical_node['logicalnodes'].each_pair do |name, url|
+      bps, eps = measure_logical_node(private_ip, name)
+      total_bps += bps
+      total_eps += eps
+    end
+    
+    write({
+            :host         => node_name,
+            :host_groups  => self.class::NODE_HOSTGROUPS,
+            :templates    => self.class::NODE_TEMPLATES,
+            :applications => self.class::NODE_APPLICATIONS
+          }) do |d|
+
+      d << ['flume.mem.heap.committed',  physical_node['jvmInfo']['mem.heap.committed'] ]
+      d << ['flume.mem.heap.init',       physical_node['jvmInfo']['mem.heap.init']      ]
+      d << ['flume.mem.heap.max',        physical_node['jvmInfo']['mem.heap.max']       ]
+      d << ['flume.mem.heap.used',       physical_node['jvmInfo']['mem.heap.used']      ]
+      d << ['flume.mem.other.committed', physical_node['jvmInfo']['mem.other.committed']]
+      d << ['flume.mem.other.init',      physical_node['jvmInfo']['mem.other.init']     ]
+      d << ['flume.mem.other.max',       physical_node['jvmInfo']['mem.other.max']      ]
+      d << ['flume.mem.other.used',      physical_node['jvmInfo']['mem.other.used']     ]
+      d << ['flume.bytes',               total_bps                                      ]
+      d << ['flume.events',              total_eps                                      ]
+    end
+    [total_bps, total_eps]
+  end
+
+  def measure_logical_node(private_ip, logical_node_name)
+    bps, eps = 0.0, 0.0
+    url      = flume_url(private_ip, 'node', 'reports', logical_node_name)
+    begin
+      before_response = open(url).read
+      before          = Time.now
+      sleep(1.0)
+      after_response  = open(url).read
+      after           = Time.now
+    rescue SocketError, OpenURI::HTTPError, Errno::ECONNREFUSED => e
+      return [bps, eps]
+    end
+
+    begin
+      before_data = JSON.parse(before_response)
+      after_data  = JSON.parse(after_response)
+    rescue JSON::ParserError => e
+      return [bps, eps]
+    end
+
+    before_bytes,  after_bytes  = 0, 0
+    before_events, after_events = 0, 0
+    before_node.each_pair do |key, value|
+      case
+      when key =~ /number of bytes$/
+        before_bytes += value.to_i
+      when key =~ /number of events$/
+        before_events += value.to_i
+      else
+        next
+      end
+    end
+    after_node.each_pair do |key, value|
+      case
+      when key =~ /number of bytes$/
+        after_bytes += value.to_i
+      when key =~ /number of events$/
+        after_events += value.to_i
+      else
+        next
+      end
+    end
+
+    bytes  = (after_bytes  - before_bytes).to_f
+    events = (after_events - before_events).to_f
+    time   = (after - before).to_f
+
+    [bytes / time, events / time] rescue [bps, eps]
+  end
+
+end

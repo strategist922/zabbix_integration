@@ -1,0 +1,25 @@
+= Zabbix Integration Cookbook
+
+== Overview
+
+This cookbook provides monitoring scripts which
+
+- provide performance metrics about a (possibly distributed) component
+- without having to be deployed on the same nodes that run the
+  component
+- submit this data to a Zabbix server
+
+== Usage
+
+Each script relies on a Zabbix agent having previously been installed
+on this node as the +zabbix_sender+ utility is required to send data
+to Zabbix.
+
+Each script also relies on the local <tt>/dev/zabbix</tt> pipe
+implemented in the +default+ recipe of this cookbook.  This named pipe
+is consumed by a (Rubix) wrapper around +zabbix_sender+.
+
+Adding a recipe like <tt>zabbix_integration::elasticsearch</tt> will
+create a Ruby script that wakes intermittently to contact the
+(possibly remote) component it is monitoring to extract data.  This
+data will be fed to the Zabbix pipe.
