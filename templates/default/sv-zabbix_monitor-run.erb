@@ -1,3 +1,3 @@
 #!/bin/bash
 exec 2>&1
-exec ruby <%= @options[:monitor_path] %> --chef_server_url=<%= Chef::Config[:chef_server_url] %> --chef_node_name=<%= Chef::Config[:node_name] %> --chef_client_key=<%= Chef::Config[:client_key] %> --loop=<%= @loop %> /dev/zabbix
+exec ruby <%= @options[:monitor_path] %> --chef_server_url=<%= Chef::Config[:chef_server_url] %> --chef_node_name=<%= Chef::Config[:node_name] %> --chef_client_key=<%= Chef::Config[:client_key] %> --loop=<%= @loop || 30 %> > /dev/zabbix

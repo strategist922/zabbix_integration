@@ -16,8 +16,8 @@ class HBaseMonitor < Rubix::ClusterMonitor
   NODE_TEMPLATES    = 'Template_HBase_Node'
 
   # Applications for items that are written
-  CLUSTER_APPLICATIONS = '_cluster'
-  NODE_APPLICATIONS    = "Hbase"
+  CLUSTER_APPLICATIONS = 'HBase'
+  NODE_APPLICATIONS    = "HBase"
 
   def node_query
     'announces:*-hbase-stargate'
@@ -55,11 +55,11 @@ class HBaseMonitor < Rubix::ClusterMonitor
             :templates    => self.class::CLUSTER_TEMPLATES,
             :applications => self.class::CLUSTER_APPLICATIONS
           }) do |d|
-      d << ['requests',    cluster_status['requests']]
-      d << ['regions',     cluster_status['regions']]
-      d << ['load',        cluster_status['averageLoad']]
-      d << ['nodes.dead',  dead_nodes.size]
-      d << ['nodes.alive', live_nodes.size]
+      d << ['hbase.requests',    cluster_status['requests']]
+      d << ['hbase.regions',     cluster_status['regions']]
+      d << ['hbase.load',        cluster_status['averageLoad']]
+      d << ['hbase.nodes.dead',  dead_nodes.size]
+      d << ['hbase.nodes.alive', live_nodes.size]
     end
     measure_cluster_tables(cluster_name, data)
     measure_cluster_nodes(cluster_name, live_nodes)

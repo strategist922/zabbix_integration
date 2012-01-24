@@ -16,7 +16,7 @@ class FlumeMonitor < Rubix::ClusterMonitor
   NODE_TEMPLATES    = 'Template_Flume_Node'
 
   # Applications for new items
-  CLUSTER_APPLICATIONS = 'Throughput'
+  CLUSTER_APPLICATIONS = 'Flume'
   NODE_APPLICATIONS    = 'Flume'
 
   def node_query
@@ -40,8 +40,8 @@ class FlumeMonitor < Rubix::ClusterMonitor
             :templates    => self.class::CLUSTER_TEMPLATES,
             :applications => self.class::CLUSTER_APPLICATIONS
           }) do |d|
-      d << [ 'bytes',  total_bps ]
-      d << [ 'events', total_eps ]
+      d << [ 'flume.bytes',  total_bps ]
+      d << [ 'flume.events', total_eps ]
     end
   end
 
@@ -133,3 +133,5 @@ class FlumeMonitor < Rubix::ClusterMonitor
   end
 
 end
+
+FlumeMonitor.run if $0 == __FILE__

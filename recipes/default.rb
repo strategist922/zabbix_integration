@@ -7,7 +7,7 @@ end
 
 zabbix_server_ip = default_zabbix_server_ip
 runit_service "zabbix_pipe" do
-  options { :server => zabbix_server_ip }
+  options :server => zabbix_server_ip
 end
 
 announce(:zabbix, :pipe, :logs => { :pipe => '/etc/sv/zabbix_pipe/log/main/current' }, :daemons => { :pipe => 'zabbix_pipe' })
