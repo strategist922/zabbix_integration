@@ -20,7 +20,7 @@ class FlumeMonitor < Rubix::ClusterMonitor
   NODE_APPLICATIONS    = 'Flume'
 
   def node_query
-    'announces:*-flume-master'
+    'announces:*-flume-master OR announces:*-flume-node'
   end
 
   def flume_url private_ip, *args
