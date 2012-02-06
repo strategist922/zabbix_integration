@@ -12,6 +12,9 @@ components_with(:ports).each do |component|
     # Now we figure out the actual ports.
     aspect_props = { :port => aspect_props } unless aspect_props.is_a?(Hash)
 
+    # Skip if we need to
+    next if aspect_props[:monitor] == false
+
     # The item key is used to define what the zabbix Item measures
     # as well as refer to connect a Trigger to an Item.
     #

@@ -9,6 +9,10 @@ components_with(:logs).each do |component|
     # Now we figure out the paths to the actual log files that will
     # need to be rotated by lograted for this aspect.
     aspect_props = { :path => aspect_props } unless aspect_props.is_a?(Hash)
+
+    # Skip if we need to
+    next if aspect_props[:monitor] == false
+    
     log_path = aspect_props[:path]
     case
     when !File.exist?(log_path)

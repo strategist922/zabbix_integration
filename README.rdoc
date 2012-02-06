@@ -26,14 +26,14 @@ themselves along with their aspects.  A typical example might be
     :ports   => { :master  => 8080, :slave1 => 8081, :slave2 => 8082 },
     :daemons => { :unicorn => 'webapp_backend' }
     })
-
+  
   # in webapp/recipes/frontend.rb
   announce(:webapp, :frontend, {
     :logs    => { :nginx => '/var/www/webapp/shared/logs' },
     :ports   => { :http  => 80 },
     :daemons => { :nginx => 'nginx' }
   })
-
+  
   # in webapp/recipes/worker.rb
   announce(:webapp, :worker, {
     :logs    => { :resque => '/var/www/webapp/shared/logs' },
@@ -94,16 +94,24 @@ priority:
       # high throughput access log
       :access => {
         :path     => "/var/www/webapp/webapp.access.log",
-	# maximum size is always in MB
-	:max_size => 1024,
-	# priority is one of: not_classified information warning average high disaster
-        :priority => :high
+	:max_size => 1024, # in MB
+        :priority => :high # or: not_classified information warning average high disaster
       },
       # low throughput error log
       :error => {
         :path     => "/var/www/webapp/webapp.error.log",
 	:max_size => 200,
 	:priority => :warning
+      }}})
+
+A log aspect can be declared and monitoring can be selectively
+disabled:
+
+  announce(:webapp, :worker, {
+    :logs => {
+      :access => {
+        :path    => "/var/www/webapp/webapp.access.log",
+	:monitor => false
       }}})
 
 ==== zabbix_integration::ports
@@ -127,7 +135,7 @@ Declaring a port and overriding these options occur in the same place.
 
 Here's a simple component with some ports:
 
-  announce(:webapp, :frontend, :ports => { :app => 8080, :admin => 8081 }
+  announce(:webapp, :frontend, :ports => { :app => 8080, :admin => 8081 })
 
 Here we dig in, specifying a different tolerance for failures and
 performance:
@@ -135,7 +143,7 @@ performance:
   announce(:webapp, :frontend, {
     :ports => {
       :app => {
-        :port 	       => 8080
+        :port 	       => 8080,
 	:failures      => 2,
 	:response_time => 1.0
       },
@@ -169,6 +177,15 @@ the priority can be configured on a per-port basis:
 All port-checks are defined as "simple" Zabbix checks so they will be
 initiated by the server to the node -- the node is not just looping
 back on itself to measure a local port's performance.
+
+A port aspect can be announced and have its monitoring disabled:
+
+  announce(:webapp, :frontend, {
+    :ports => {
+      :app => {
+        :port    => 8080,
+	:monitor => false
+      }}})
 
 ==== zabbix_integration::daemons
 
