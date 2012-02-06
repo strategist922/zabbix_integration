@@ -117,7 +117,9 @@ disabled:
 ==== zabbix_integration::ports
 
 This recipe monitors ports along with their availability and
-performance.
+performance.  Failures to connect to a port will cause an availability
+alert and poor response time from a port will cause a response time
+alert.
 
 The following attributes define the default maximum failures and the
 default maximum average response time over chosen intervals with
@@ -189,7 +191,75 @@ A port aspect can be announced and have its monitoring disabled:
 
 ==== zabbix_integration::daemons
 
-This recipe monitors running daemons.  It's not set up yet.
+This recipe monitors running daemons.  If a daemon process is not
+found to be running, an alert will be sent.
+
+The following attributes define the default priority for alerts
+triggered when daemons are found to be not running:
+
+  default[:zabbix_integration][:daemons][:running][:priority] = :average
+
+Declaring a daemon and overriding this default option occur in the
+same place.
+
+Here's a simple component with a daemon:
+
+  announce(:webapp, :frontend, :daemons => { :unicorn => 'unicorn' })
+
+If no process naemd 'unicorn' can be found on the node then this will
+cause an alert.
+
+Some command line programs, typically those that are compiled, are
+their own 'process name': 'nginx', 'sort', 'sshd', &c.  Interpreted
+scripts ('/usr/bin/my-ruby-script') also work this way.
+
+For some daemons, the process name may not be useful or may not be
+enough to distinguish the daemon.  In this case we can pass another
+option
+
+  announce(:webapp, :frontend, {
+    :daemons => {
+      :php_cgi => {
+        :name => 'php-cgi',
+	:cmd  => 'webapp.ini'
+      }}})
+
+Where the actual command line of the process is filtered using
+'webapp.ini' (it's not clear what the limits to this filtering syntax
+is -- best not get too crazy).
+
+Sometimes its sufficient to identify a process run by a user:
+
+  announce(:webapp, :frontend, {
+    :daemons => {
+      :php_cgi => {
+        :name => 'php-cgi',
+	:user => 'www-data'
+      }}})
+
+It's also possible to list multiple processes with specific counts:
+
+  announce(:webapp, :frontend, {
+    :daemons => {
+      :unicorn_master => {
+        :name   => '',
+	:cmd    => 'unicorn master',
+	:number => 1
+      },
+      :unicorn_worker => {
+        :name   => '',
+	:cmd    => 'unicorn worker',
+	:number => 4
+      }}})
+
+A daemon aspect can be announced and have its monitoring disabled:
+
+  announce(:webapp, :frontend, {
+    :daemons => {
+      :nginx => {
+        :name    => 'nginx',
+	:monitor => false
+      }}})
 
 === Standalone Monitors
 

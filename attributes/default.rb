@@ -15,9 +15,15 @@ default[:zabbix_integration][:logs][:file_size][:priority] = :warning
 # Port availability check.
 default[:zabbix_integration][:ports][:availability][:window]   = 900
 default[:zabbix_integration][:ports][:availability][:failures] = 5
-default[:zabbix_integration][:ports][:availability][:priority] = :high
+default[:zabbix_integration][:ports][:availability][:priority] = :average
 
 # Port performance check.
 default[:zabbix_integration][:ports][:response_time][:window]   = 900
 default[:zabbix_integration][:ports][:response_time][:average]  = 3.0
 default[:zabbix_integration][:ports][:response_time][:priority] = :warning
+
+
+#
+# Daemons
+#
+default[:zabbix_integration][:daemons][:running][:priority] = :average

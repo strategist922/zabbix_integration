@@ -83,3 +83,14 @@ attribute "zabbix_integration/ports/response_time/priority",
   :display_name          => "",
   :description           => "The default priority of alerts due to ports with an average response time that has grown too high.",
   :default               => "warning"
+
+
+#
+# Daemons
+#
+
+# Running check
+attribute "zabbix_integration/daemons/running/priority",
+  :display_name          => "",
+  :description           => "The default priority of alerts trigger because daemons weren't running.",
+  :default               => "average"
