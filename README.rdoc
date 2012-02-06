@@ -2,24 +2,209 @@
 
 == Overview
 
-This cookbook provides monitoring scripts which
+This cookbook integrates all systems with Zabbix monitoring using
+Cluster Chef.
 
-- provide performance metrics about a (possibly distributed) component
-- without having to be deployed on the same nodes that run the
-  component
-- submit this data to a Zabbix server
+It has two kinds of recipes:
+
+1) Recipes for integrated monitoring of common aspects of components
+like logs, ports, daemons, &c.
+
+2) Recipes for standalone monitors of distributed systems like
+databases that Zabbix can't talk to directly.
 
 == Usage
 
-Each script relies on a Zabbix agent having previously been installed
-on this node as the +zabbix_sender+ utility is required to send data
-to Zabbix.
+=== Aspect Monitoring
 
-Each script also relies on the local <tt>/dev/zabbix</tt> pipe
-implemented in the +default+ recipe of this cookbook.  This named pipe
-is consumed by a (Rubix) wrapper around +zabbix_sender+.
+Components following the Metachef cookbook's approach announce
+themselves along with their aspects.  A typical example might be
 
-Adding a recipe like <tt>zabbix_integration::elasticsearch</tt> will
-create a Ruby script that wakes intermittently to contact the
-(possibly remote) component it is monitoring to extract data.  This
-data will be fed to the Zabbix pipe.
+  # in webapp/recipes/backend.rb
+  announce(:webapp, :backend, {
+    :logs    => { :unicorn => '/var/www/webapp/shared/logs' },
+    :ports   => { :master  => 8080, :slave1 => 8081, :slave2 => 8082 },
+    :daemons => { :unicorn => 'webapp_backend' }
+    })
+
+  # in webapp/recipes/frontend.rb
+  announce(:webapp, :frontend, {
+    :logs    => { :nginx => '/var/www/webapp/shared/logs' },
+    :ports   => { :http  => 80 },
+    :daemons => { :nginx => 'nginx' }
+  })
+
+  # in webapp/recipes/worker.rb
+  announce(:webapp, :worker, {
+    :logs    => { :resque => '/var/www/webapp/shared/logs' },
+    :ports   => { :admin  => 9000 },
+    :daemons => { :web => 'resque_web', :worker1 => 'resque_worker_1, :worker2 -> 'resque_worker_2' }
+  })
+
+These recipes may run on the same or on different machines.  Each
+announcement decalres all the aspects in a way that allows them to be
+monitored or processed in a fashion decoupled from the 'webapp'
+cookbook itself.
+
+This cookbook sets up Zabbix items and triggers to monitor and alert
+on each aspect a component may declare.
+
+The following recipes are available:
+
+==== zabbix_integration::logs
+
+This recipe monitors log files and directories, ensuring that the
+files within do not grow too large.
+
+The following attributes define the default maximum file size and
+alert priority for a bloated log file.
+
+  default[:zabbix_integration][:logs][:file_size][:max_size] = 200
+  default[:zabbix_integration][:logs][:file_size][:priority] = :warning
+
+Declaring a log file and overriding these options occur in the same
+place.
+
+Here's a component declaring a log directory.  All files *immediately*
+within the directory will be monitored with the default settings:
+
+  announce(:webapp, :worker, { :logs => "/var/www/webapp/logs" })
+
+Here's a component declaring a specific log file:
+
+  announce(:webapp, :worker, {
+    :logs => {
+      :access => "/var/www/webapp/webapp.access.log",
+      :error  => "/var/www/webapp/webapp.error.log"
+    }})
+
+There are two reasons for individually specifying log files in the
+*same* directory:
+
+1) You want to provide different handling for each file (see
+customization below)
+
+2) Not all the other files in the directory are logs.
+
+Here's a component customizing the maximum log file size and the alert
+priority:
+
+  announce(:webapp, :worker, {
+    :logs => {
+      # high throughput access log
+      :access => {
+        :path     => "/var/www/webapp/webapp.access.log",
+	# maximum size is always in MB
+	:max_size => 1024,
+	# priority is one of: not_classified information warning average high disaster
+        :priority => :high
+      },
+      # low throughput error log
+      :error => {
+        :path     => "/var/www/webapp/webapp.error.log",
+	:max_size => 200,
+	:priority => :warning
+      }}})
+
+==== zabbix_integration::ports
+
+This recipe monitors ports along with their availability and
+performance.
+
+The following attributes define the default maximum failures and the
+default maximum average response time over chosen intervals with
+chosen alert priority:
+
+  default[:zabbix_integration][:ports][:availability][:window]   = 900
+  default[:zabbix_integration][:ports][:availability][:failures] = 5
+  default[:zabbix_integration][:ports][:availability][:priority] = :high
+  
+  default[:zabbix_integration][:ports][:response_time][:window]   = 900
+  default[:zabbix_integration][:ports][:response_time][:average]  = 3.0
+  default[:zabbix_integration][:ports][:response_time][:priority] = :warning
+
+Declaring a port and overriding these options occur in the same place.
+
+Here's a simple component with some ports:
+
+  announce(:webapp, :frontend, :ports => { :app => 8080, :admin => 8081 }
+
+Here we dig in, specifying a different tolerance for failures and
+performance:
+
+  announce(:webapp, :frontend, {
+    :ports => {
+      :app => {
+        :port 	       => 8080
+	:failures      => 2,
+	:response_time => 1.0
+      },
+      :admin => {
+        :port 	       => 8081,
+	:failures      => 20,
+	:repsonse_time => 5.0
+      }}})
+
+Both the maximum number of failures and the average response time are
+measured over the last 15 minutes (900 s).  This timeframe as well as
+the priority can be configured on a per-port basis:
+
+  announce(:webapp, :frontend, {
+    :ports => {
+      :app => {
+        :port 	       	       	=> 8080
+	
+	:failures      	       	=> 2,
+	:availability_window   	=> 900,
+	:availability_priority 	=> :high,
+
+	:response_time 	  	=> 1.0,
+	:response_time_window 	=> 60,
+	:response_time_priority => :high
+	
+      },
+      ...
+      }}})
+
+All port-checks are defined as "simple" Zabbix checks so they will be
+initiated by the server to the node -- the node is not just looping
+back on itself to measure a local port's performance.
+
+==== zabbix_integration::daemons
+
+This recipe monitors running daemons.  It's not set up yet.
+
+=== Standalone Monitors
+
+Zabbix likes to monitor systems via the Zabbix agent that is installed
+on each monitored machine.  This works well for systems that are
+limited to a single node and that can speak Zabbix's protocol or be
+defined via UserParameters but fails horribly when trying to monitor
+something like a distributed database.
+
+Happily Zabbix allows for measurements to be directly sent to it via
+some long-running script.
+
+This cookbook defines several such Ruby scripts.  Each:
+
+- provides performance metrics about a (possibly distributed)
+  component
+
+- without having to be deployed on the same nodes that run the
+  component
+  
+- submits this data to a Zabbix server via a persistent FIFO set up on
+  the node.
+
+The recipes which set up standalone monitors include:
+
+- zabbix_integration::elasticsearch_monitor to monitor an ElasticSearch cluster
+
+- zabbix_integration::flume_monitor to monitor a Flume cluster
+
+- zabbix_integration::hbase_monitor to monitor an HBase cluster
+
+- zabbix_integration::redis_monitor to monitor Redis nodes
+
+- zabbix_integration::mongodb_monitor to monitor MongoDB nodes
+

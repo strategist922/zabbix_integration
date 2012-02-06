@@ -26,4 +26,9 @@ define :zabbix_monitor, :packages => [], :gems => [], :loop => 30, :action => :e
     template_name "zabbix_monitor"
     options :monitor_path => monitor_path, :loop => params[:loop]
   end
+
+  announce(monitor, :monitor, {
+             :logs    => { :sv => "/etc/sv/#{monitor}_monitor/log/main/current" },
+             :daemons => { :sv => "#{monitor}_monitor"                          }
+           })
 end

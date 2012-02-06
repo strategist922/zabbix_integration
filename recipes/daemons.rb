@@ -1,0 +1,3 @@
+zabbix_server_ip = default_zabbix_server_ip
+
+# nothing here yet...
