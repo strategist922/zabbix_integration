@@ -27,8 +27,6 @@ components_with(:logs).each do |component|
     # For each path this log aspect has...
     paths.each do |path|
 
-      Chef::Log.info("Processing #{component.fullname}:#{path}")
-
       # The item key is used to define what the zabbix Item measures
       # as well as refer to connect a Trigger to an Item.
       #
